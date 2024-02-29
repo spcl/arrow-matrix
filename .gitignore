@@ -1,0 +1,12 @@
+.idea/
+.idea/*
+venv/*
+wandb/*
+logs/*
+tmp/*
+test_env/*
+/figures_first/
+*.DS_STORE
+arrow.egg-info/*
+*/__pycache__/*
+*/*/__pycache__/*

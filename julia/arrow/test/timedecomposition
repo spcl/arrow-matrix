@@ -1,0 +1,25 @@
+include("../ArrowDecomposition.jl")
+
+function test()
+    # REFACTOR TEST
+    dataset = "roadNet-PA"
+    path = "/Users/huanglangwen/Documents/Code/SparseMatrixCollection"
+    mat_path = joinpath(path, "$dataset.mat")
+    sparse_adj = read_sparse_matrix(mat_path)
+    
+    nblocks = 20
+    max_decomp = 5
+    block_diagonal = true
+    arrow_width::Int = div(size(sparse_adj, 1), nblocks) + 3
+    decomposition = Vector{ArrowGraph}()
+    @time begin
+        decomposition = arrow_decomposition(sparse_adj, arrow_width, nblocks, block_diagonal)
+    end
+    store_decomposition(path, decomposition, block_diagonal, dataset)
+    
+    level = 0
+    for decomp in decomposition
+        print("Level ", level, ", nonzero_rows ", decomp.nonzero_rows, ", actual_width ", decomp.arrow_width, ", desired_width ", arrow_width,"\n")
+        level += 1
+    end
+end
