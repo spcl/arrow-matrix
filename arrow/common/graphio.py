@@ -5,6 +5,8 @@ import igraph
 import numpy as np
 import pickle
 
+from tqdm import tqdm
+
 import arrow.decomposition
 from numpy import typing as npt
 from scipy import sparse
@@ -74,12 +76,13 @@ def save_decomposition(graph: igraph.Graph,
                        dtype: npt.DTypeLike = np.float32,
                        use_width: bool = True,
                        block_diagonal: bool = True,
-                       saveGraph: bool = True) -> None:
+                       save_graph: bool = True) -> None:
     """
     Saves the decomposition to files in scipy csr format
     The i-th part of the decomposition is stored as {filename}_B_{width}_{bd}_{i}.npz
     The permutation that maps the original id's to the id's of B_i is in {filename}_B_{width}_{bd}_{i}_permutation.py
     as a numpy array.
+    :param graph: the graph to store (if save_graph is True)
     :param decomposition: the decomposition to store
     :param filename: prefix to use for storing the files
     :param dtype: the data type to use for the sparse matrices
@@ -88,7 +91,7 @@ def save_decomposition(graph: igraph.Graph,
     :return: None
     """
 
-    if saveGraph:
+    if save_graph:
         # Save graph
         with open(f"{filename}_graph.pickle", "wb") as f:
             pickle.dump(graph, f)
@@ -131,21 +134,29 @@ def save_decomposition_new(graph: igraph.Graph,
                            dtype: npt.DTypeLike = np.float32,
                            use_width: bool = True,
                            block_diagonal: bool = True,
-                           saveGraph: bool = True) -> None:
+                           save_graph: bool = True) -> None:
     """
     Saves the decomposition to files in scipy csr format
     each part of the decomposition is stored
     in three separate arrays: *_indptr.npy, *_indices.npy, *_data.npy
+
+    The i-th part of the decomposition is stored as three arrays:
+    {filename}_B_{width}_{i}_{bd}_indptr.npy,
+    {filename}_B_{width}_{i}_{bd}_indices.npy,
+     {filename}_B_{width}_{i}_{bd}_data.npy
+    The permutation that maps the original id's to the id's of B_i is in
+    {filename}_B_{width}_{i}_{bd}_permutation.py
 
     :param decomposition: the decomposition to store
     :param filename: prefix to use for storing the files
     :param dtype: the data type to use for the sparse matrices
     :param use_width: ignored. exists for backwards compatibility.
     :param block_diagonal: whether the decomposition uses the block diagonal in the filename
+    :param save_graph: whether to save the input graph to a pickled file
     :return: None
     """
 
-    if saveGraph:
+    if save_graph:
         # Save graph
         with open(f"{filename}_graph.pickle", "wb") as f:
             pickle.dump(graph, f)
@@ -158,20 +169,26 @@ def save_decomposition_new(graph: igraph.Graph,
         np.save(f"{filename}_A_data.npy", A.data)
 
     # Save B
-    for i, arrow in enumerate(decomposition):
-        A = arrow.graph.get_adjacency_sparse().astype(dtype)
+    arrow_width = 0
+    for i, arrow_m in enumerate(decomposition):
+        A = arrow_m.graph.get_adjacency_sparse().astype(dtype)
 
-        basename = get_pathname(filename, arrow.arrow_width, block_diagonal)
+        path = format_path(filename, arrow_m.arrow_width, i, block_diagonal, DecompositionFileType.indptr_npy)
+        np.save(path, A.indptr)
+        path = format_path(filename, arrow_m.arrow_width, i, block_diagonal, DecompositionFileType.indices_npy)
+        np.save(path, A.indices)
+        path = format_path(filename, arrow_m.arrow_width, i, block_diagonal, DecompositionFileType.data_npy)
+        np.save(path, A.data)
+        path = format_path(filename, arrow_m.arrow_width, i, block_diagonal, DecompositionFileType.permutation_npy)
+        np.save(path, arrow_m.permutation)
 
-        # sparse.save_npz(f"{basename}_{i}.npz", A)
-        np.save(f"{basename}_{i}_indptr.npy", A.indptr)
-        np.save(f"{basename}_{i}_indices.npy", A.indices)
-        np.save(f"{basename}_{i}_data.npy", A.data)
-        np.save(f"{basename}_{i}_permutation.npy", arrow.permutation)
+        if i == 0:
+            arrow_width = arrow_m.arrow_width
 
     # Save nonzeros (for convenience)
     nonzero_rows = np.asarray([a.nonzero_rows for a in decomposition], dtype=np.int64)
-    np.save(f"{basename}_nonzeros.npy", nonzero_rows)
+    path = format_path(filename, arrow_width, 0, block_diagonal, DecompositionFileType.nonzero_rows_npy)
+    np.save(path, nonzero_rows)
 
 
 def load_decomposition(filename: str, width: int = None, block_diagonal: bool = True, no_permutation=False) \
@@ -232,17 +249,17 @@ def load_decomposition(filename: str, width: int = None, block_diagonal: bool = 
 
 
 def load_decomposition_new(filename: str, width: int = None, block_diagonal: bool = True, no_permutation=False,
-                           mem_map=True) \
+                           mem_map=False) \
         -> list[(Any, Union[None, npt.NDArray[np.integer]])]:
     """
     Loads the decomposition from files in csr format
     Can either construct the scipy csr matrix or use memory mapping to load it.
     The i-th part of the decomposition is stored as three arrays:
-    {filename}_B_{width}_{bd}_{i}_indptr.npy,
-    {filename}_B_{width}_{bd}_{i}_indices.npy,
-     {filename}_B_{width}_{bd}_{i}_data.npy
+    {filename}_B_{width}_{i}_{bd}_indptr.npy,
+    {filename}_B_{width}_{i}_{bd}_indices.npy,
+     {filename}_B_{width}_{i}_{bd}_data.npy
     The permutation that maps the original id's to the id's of B_i is in
-    {filename}_B_{width}_{bd}_{i}_permutation.py
+    {filename}_B_{width}_{i}_{bd}_permutation.py
     as a numpy array.
     :param no_permutation: If true, the permutation matrix is not loaded (None is at its place)
     :param filename: prefix to use for loading the files
@@ -395,7 +412,7 @@ def split_matrix_to_blocks_new(A: sparse.csr_matrix,
                                use_min_shape: bool = False) -> List[List[Union[sparse.csr_matrix, None]]]:
     """
     Splits the matrix A into blocks of size block_size x block_size
-    TODO: Update documentation
+
     :param A: the matrix to split
     :param block_size: the size of the blocks
     :param dtype: the data type to use for the blocks. If None, the data type of A is used.
