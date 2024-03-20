@@ -53,7 +53,8 @@ def bench_spmm(path: Union[str, None],
     blocks, n_blocks, to_prev, to_next = arrow_dec_mpi.ArrowDecompositionMPI.load_decomposition_new(comm, path, width,
                                                                                                     blocked, datatype,
                                                                                                     slim=slim,
-                                                                                                    use_mmap=npy_format)
+                                                                                                    use_npy=npy_format,
+                                                                                                    use_mmap=False)
 
     if blocks is not None:
         print("RANK loaded decomposition", comm.Get_rank(), n_blocks, "(slim): ", slim, flush=True)
