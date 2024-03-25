@@ -22,10 +22,10 @@ def main() -> None:
     parser.add_argument('-m', '--ba_neighbors', type=int, default=3,
                         help='Number of neighbors per bertex (For synthetic data only)')
     # Add slim argument
-    parser.add_argument('-s', '--slim', type=utils.str2bool, nargs="?", default=False,
+    parser.add_argument('-s', '--slim', type=utils.str2bool, nargs="?", default=True,
                         help='If true, the decomposition onto ranks is "slim" assigning one rank per row-block.')
     # Add npy argument
-    parser.add_argument('-n', '--npy', type=utils.str2bool, nargs="?", default=False,
+    parser.add_argument('-n', '--npy', type=utils.str2bool, nargs="?", default=True,
                         help='If true, the decomposition is loaded from the indices / indptr files.')
 
     args = vars(parser.parse_args())

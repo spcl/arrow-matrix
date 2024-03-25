@@ -50,12 +50,22 @@ Using the arrow matrix spmm requires two steps:
 We provide two implementations for 1., one in python and one in Julia.
 The python implementation may be called from the `arrow_decompose` commandline call.
 
-Example Usage:
+Example Usage (.mat input):
 ```commandline
-arrow_decompose --dataset_dir ~/data --dataset_name graph1 graph2 --width 10000
+arrow_decompose --dataset_dir ~/data --dataset_name graph1 graph2 --format 'matlab' --width 10000
 ```
+
+Example Usage Matrix Market (.mtx) input:
+```commandline
+arrow_decompose --dataset_dir ~/data --dataset_name graph1 graph2 --format 'mtx' --width 10000
+```
+Options:
+* For a directed graph, pass `--directed True`.
+* To visualize the arrow matrices, pass `--visualize True`. 
+* Pass `save_input_graph True` to save the input graph in order to speed up later invocations of the script.
+
 The Julia implementation may be called from the `ArrowDecompositionMain.jl` script.
-It is necessary to convert its output to the npy forma using the `convert_to_csr.jl` scripy
+It is necessary to convert its output to the npy format using the `convert_to_csr.jl` scripy
 
 To multiply 10 times with the decomposed matrix on random right-hand sides, you can use the `spmm_arrow` commandline call.
 ```commandline

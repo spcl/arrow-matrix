@@ -21,7 +21,7 @@ except Exception as e:
 class ArrowDecompositionMPI:
     # Holds the slices and communicators for the 'own' part of the decomposition
     # Specifically, the matrix at position self.matrix_index
-    B: ArrowMPI
+    B: ArrowMatrix
 
     # Index of the matrix that the current rank is responsible for
     matrix_index: int
@@ -633,6 +633,7 @@ class ArrowDecompositionMPI:
                                is_block_diagonal: bool,
                                datatype=np.float32,
                                slim=False,
+                               use_npy=True,
                                use_mmap=False):
         """
         Loads a decomposed graph from file and distributes it to the processors in comm.
@@ -658,13 +659,14 @@ class ArrowDecompositionMPI:
         to_next_p = None
 
         if rank == 0:
-            if use_mmap:
-                decomposition = graphio.load_decomposition_new(filename, width, block_diagonal=is_block_diagonal)
+            if use_npy:
+                decomposition = graphio.load_decomposition_new(filename, width, block_diagonal=is_block_diagonal, mem_map=use_mmap)
             else:
                 decomposition = graphio.load_decomposition(filename, width, block_diagonal=is_block_diagonal)
             if len(decomposition) == 0:
                 print("ERROR: decomposition with name ", filename, " and width ", width, "not found", flush=True, file=sys.stderr)
 
+            assert decomposition is not None
             decomposition_length[0] = len(decomposition)
 
         comm.Bcast(decomposition_length)
@@ -680,6 +682,7 @@ class ArrowDecompositionMPI:
                 print(f"Cutting the permutation; Part {i}")
                 number_of_blocks = ArrowDecompositionMPI.number_of_blocks(adjacency, width)
                 n_blocks[i] = number_of_blocks
+            print("Number of blocks: ", n_blocks, flush=True)
 
         comm.Bcast(n_blocks)
 
